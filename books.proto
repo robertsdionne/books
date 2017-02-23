@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/api/annotations.proto";
+
+service LibraryService {
+  rpc ListBooks(ListBooksRequest) returns (ListBooksResponse) {
+    // List method maps to HTTP GET.
+    option (google.api.http) = {
+      // The `parent` captures the parent resource name, such as "shelves/shelf1".
+      get: "/v1/{parent=shelves/*}/books"
+    };
+  }
+
+  rpc GetBook(GetBookRequest) returns (Book) {
+    // Get maps to HTTP GET. Resource name is mapped to the URL. No body.
+    option (google.api.http) = {
+      // Note the URL template variable which captures the multi-segment resource
+      // name of the requested book, such as "shelves/shelf1/books/book2"
+      get: "/v1/{name=shelves/*/books/*}"
+    };
+  }
+
+  rpc CreateBook(CreateBookRequest) returns (Book) {
+    // Create maps to HTTP POST. URL path as the collection name.
+    // HTTP request body contains the resource.
+    option (google.api.http) = {
+      // The `parent` captures the parent resource name, such as "shelves/1".
+      post: "/v1/{parent=shelves/*}/books"
+      body: "book"
+    };
+  }
+
+  rpc CreateShelf(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/v1/shelves"
+      body: "shelf"
+    };
+  }
+
+  rpc UpdateBook(UpdateBookRequest) returns (Book) {
+    // Update maps to HTTP PATCH. Resource name is mapped to a URL path.
+    // Resource is contained in the HTTP request body.
+    option (google.api.http) = {
+      // Note the URL template variable which captures the resource name of the
+      // book to update.
+      patch: "/v1/{book.name=shelves/*/books/*}"
+      body: "book"
+    };
+  }
+
+  rpc DeleteBook(DeleteBookRequest) returns (google.protobuf.Empty) {
+    // Delete maps to HTTP DELETE. Resource name maps to the URL path.
+    // There is no request body.
+    option (google.api.http) = {
+      // Note the URL template variable capturing the multi-segment name of the
+      // book resource to be deleted, such as "shelves/shelf1/books/book2"
+      delete: "/v1/{name=shelves/*/books/*}"
+    };
+  }
+}
+
+message Book {
+  // Resource name of the book. It must have the format of "shelves/*/books/*".
+  string name = 1;
+
+  // ... other properties
+}
+
+message Shelf {
+  string name = 1;
+
+  // ... other properties
+}
+
+message ListBooksRequest {
+  // The parent resource name, for example, "shelves/shelf1".
+  string parent = 1;
+
+  // The maximum number of items to return.
+  int32 page_size = 2;
+
+  // The next_page_token value returned from a previous List request, if any.
+  string page_token = 3;
+}
+
+message ListBooksResponse {
+  // The field name should match the noun "books" in the method name. There
+  // will be a maximum number of items returned based on the page_size field
+  // in the request.
+  repeated Book books = 1;
+
+  // Token to retrieve the next page of results, or empty if there are no
+  // more results in the list.
+  string next_page_token = 2;
+}
+
+message GetBookRequest {
+  // The field will contain name of the resource requested, for example:
+  // "shelves/shelf1/books/book2"
+  string name = 1;
+}
+
+message CreateBookRequest {
+  // The parent resource name where the book is to be created.
+  string parent = 1;
+
+  // The book id to use for this book.
+  string book_id = 3;
+
+  // The book resource to create.
+  // The field name should match the Noun in the method name.
+  Book book = 2;
+}
+
+message CreateShelfRequest {
+  Shelf shelf = 1;
+}
+
+message UpdateBookRequest {
+  // The book resource which replaces the resource on the server.
+  Book book = 1;
+
+  // The update mask applies to the resource.
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteBookRequest {
+  // The resource name of the book to be deleted, for example:
+  // "shelves/shelf1/books/book2"
+  string name = 1;
+}
