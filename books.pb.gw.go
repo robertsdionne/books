@@ -421,7 +421,7 @@ func RegisterLibraryServiceHandler(ctx context.Context, mux *runtime.ServeMux, c
 
 	})
 
-	mux.Handle("PATCH", pattern_LibraryService_UpdateBook_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("PUT", pattern_LibraryService_UpdateBook_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		if cn, ok := w.(http.CloseNotifier); ok {

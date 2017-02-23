@@ -51,7 +51,7 @@ service LibraryService {
     option (google.api.http) = {
       // Note the URL template variable which captures the resource name of the
       // book to update.
-      patch: "/v1/{book.name=shelves/*/books/*}"
+      put: "/v1/{book.name=shelves/*/books/*}"
       body: "book"
     };
   }

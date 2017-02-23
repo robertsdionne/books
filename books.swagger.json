@@ -71,7 +71,7 @@
       }
     },
     "/v1/{book.name}": {
-      "patch": {
+      "put": {
         "operationId": "UpdateBook",
         "responses": {
           "200": {

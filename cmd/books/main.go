@@ -1,14 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 
+	_ "github.com/lib/pq"
 	"github.com/robertsdionne/books"
-	"github.com/spf13/afero"
-
 	"google.golang.org/grpc"
 )
 
@@ -24,17 +24,22 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var fs afero.Fs
+	/*var fs afero.Fs
 	switch {
 	case *useFilesystem:
 		fs = afero.NewOsFs()
 
 	case !*useFilesystem:
 		fs = afero.NewMemMapFs()
+	}*/
+
+	db, err := sql.Open("postgres", "postgres://root@gauss:30257/books?sslmode=disable")
+	if err != nil {
+		return
 	}
 
 	grpcServer := grpc.NewServer()
-	books.RegisterLibraryServiceServer(grpcServer, books.NewServer(fs))
+	books.RegisterLibraryServiceServer(grpcServer, books.NewServer(db))
 
 	grpcServer.Serve(listener)
 }

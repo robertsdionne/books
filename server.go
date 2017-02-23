@@ -1,9 +1,8 @@
 package books
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
-	"strings"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/spf13/afero"
@@ -16,25 +15,34 @@ import (
 
 type bookServer struct {
 	Fs afero.Fs `inject:""`
+	Db *sql.DB
 }
 
-func NewServer(fs afero.Fs) *bookServer {
-	return &bookServer{Fs: fs}
+func NewServer(db *sql.DB) *bookServer {
+	return &bookServer{Db: db}
 }
 
 func (s *bookServer) ListShelves(ctx context.Context, request *ListShelvesRequest) (response *ListShelvesResponse, err error) {
 	log.Println("ListShelves", request)
 
-	response = &ListShelvesResponse{}
-	shelves, err := afero.ReadDir(s.Fs, "shelves")
+	rows, err := s.Db.Query(`
+	SELECT name FROM shelves;
+	`)
 	if err != nil {
 		return
 	}
+	defer rows.Close()
 
 	response = &ListShelvesResponse{}
-	for i := range shelves {
+	for rows.Next() {
+		var name string
+		err = rows.Scan(&name)
+		if err != nil {
+			return
+		}
+
 		response.Shelves = append(response.Shelves, &Shelf{
-			Name: fmt.Sprintf("shelves/%s", shelves[i].Name()),
+			Name: name,
 		})
 	}
 
@@ -44,25 +52,25 @@ func (s *bookServer) ListShelves(ctx context.Context, request *ListShelvesReques
 func (s *bookServer) ListBooks(ctx context.Context, request *ListBooksRequest) (response *ListBooksResponse, err error) {
 	log.Println("ListBooks", request)
 
-	response = &ListBooksResponse{}
-	books, err := afero.ReadDir(s.Fs, fmt.Sprintf("%s/books", request.Parent))
+	rows, err := s.Db.Query(`
+	SELECT name, text FROM books WHERE parent=$1;
+	`, request.Parent)
 	if err != nil {
 		return
 	}
+	defer rows.Close()
 
 	response = &ListBooksResponse{}
-	for i := range books {
-		name := fmt.Sprintf("%s/books/%s", request.Parent, books[i].Name())
-
-		var text []byte
-		text, err = afero.ReadFile(s.Fs, name)
+	for rows.Next() {
+		var name, text string
+		err = rows.Scan(&name, &text)
 		if err != nil {
 			return
 		}
 
 		response.Books = append(response.Books, &Book{
 			Name: name,
-			Text: string(text),
+			Text: text,
 		})
 	}
 
@@ -72,7 +80,10 @@ func (s *bookServer) ListBooks(ctx context.Context, request *ListBooksRequest) (
 func (s *bookServer) GetBook(ctx context.Context, request *GetBookRequest) (response *Book, err error) {
 	log.Println("GetBook", request)
 
-	text, err := afero.ReadFile(s.Fs, request.Name)
+	var name, text string
+	err = s.Db.QueryRow(`
+	SELECT name, text FROM books WHERE name=$1;
+	`, request.Name).Scan(&name, &text)
 	if err != nil {
 		return
 	}
@@ -87,35 +98,9 @@ func (s *bookServer) GetBook(ctx context.Context, request *GetBookRequest) (resp
 func (s *bookServer) CreateBook(ctx context.Context, request *CreateBookRequest) (response *Book, err error) {
 	log.Println("CreateBook", request)
 
-	books := fmt.Sprintf("%s/books", request.Parent)
-	exists, err := afero.DirExists(s.Fs, books)
-	if err != nil {
-		return
-	}
-
-	if !exists {
-		err = s.Fs.Mkdir(books, 0755)
-		if err != nil {
-			return
-		}
-	}
-
-	if !strings.HasPrefix(request.Book.Name, books) {
-		err = fmt.Errorf("Expected book name to start with %s", books)
-		return
-	}
-
-	exists, err = afero.Exists(s.Fs, request.Book.Name)
-	if err != nil {
-		return
-	}
-
-	if exists {
-		err = fmt.Errorf("Expected book %s not to exist", request.Book.Name)
-		return
-	}
-
-	err = afero.WriteFile(s.Fs, request.Book.Name, []byte(request.Book.Text), 0655)
+	_, err = s.Db.Exec(`
+	INSERT INTO books VALUES ($1, $2, $3);
+	`, request.Parent, request.Book.Name, request.Book.Text)
 	if err != nil {
 		return
 	}
@@ -126,7 +111,10 @@ func (s *bookServer) CreateBook(ctx context.Context, request *CreateBookRequest)
 
 func (s *bookServer) CreateShelf(ctx context.Context, request *CreateShelfRequest) (response *Shelf, err error) {
 	log.Println("CreateShelf", request)
-	err = s.Fs.MkdirAll(request.Shelf.Name, 0755)
+
+	_, err = s.Db.Exec(`
+	INSERT INTO shelves VALUES ($1);
+	`, request.Shelf.Name)
 	if err != nil {
 		return
 	}
@@ -138,17 +126,9 @@ func (s *bookServer) CreateShelf(ctx context.Context, request *CreateShelfReques
 func (s *bookServer) UpdateBook(ctx context.Context, request *UpdateBookRequest) (response *Book, err error) {
 	log.Println("UpdateBook", request)
 
-	exists, err := afero.Exists(s.Fs, request.Book.Name)
-	if err != nil {
-		return
-	}
-
-	if !exists {
-		err = fmt.Errorf("Book %s not found", request.Book.Name)
-		return
-	}
-
-	err = afero.WriteFile(s.Fs, request.Book.Name, []byte(request.Book.Text), 0655)
+	_, err = s.Db.Exec(`
+	UPDATE books SET text=$2 WHERE name=$1;
+	`, request.Book.Name, request.Book.Text)
 	if err != nil {
 		return
 	}
@@ -160,7 +140,9 @@ func (s *bookServer) UpdateBook(ctx context.Context, request *UpdateBookRequest)
 func (s *bookServer) DeleteShelf(ctx context.Context, request *DeleteShelfRequest) (response *google_protobuf.Empty, err error) {
 	log.Println("DeleteShelf", request)
 
-	err = s.Fs.RemoveAll(request.Name)
+	_, err = s.Db.Exec(`
+	DELETE FROM shelves WHERE name=$1;
+	`, request.Name)
 	if err != nil {
 		return
 	}
@@ -172,7 +154,9 @@ func (s *bookServer) DeleteShelf(ctx context.Context, request *DeleteShelfReques
 func (s *bookServer) DeleteBook(ctx context.Context, request *DeleteBookRequest) (response *google_protobuf.Empty, err error) {
 	log.Println("DeleteBook", request)
 
-	err = s.Fs.Remove(request.Name)
+	_, err = s.Db.Exec(`
+	DELETE FROM books WHERE name=$1;
+	`, request.Name)
 	if err != nil {
 		return
 	}
