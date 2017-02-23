@@ -5,6 +5,12 @@ import "google/protobuf/field_mask.proto";
 import "google/api/annotations.proto";
 
 service LibraryService {
+  rpc ListShelves(ListShelvesRequest) returns (ListShelvesResponse) {
+    option (google.api.http) = {
+      get: "/v1/shelves"
+    };
+  }
+
   rpc ListBooks(ListBooksRequest) returns (ListBooksResponse) {
     // List method maps to HTTP GET.
     option (google.api.http) = {
@@ -50,6 +56,12 @@ service LibraryService {
     };
   }
 
+  rpc DeleteShelf(DeleteShelfRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/{name=shelves/*}"
+    };
+  }
+
   rpc DeleteBook(DeleteBookRequest) returns (google.protobuf.Empty) {
     // Delete maps to HTTP DELETE. Resource name maps to the URL path.
     // There is no request body.
@@ -66,12 +78,25 @@ message Book {
   string name = 1;
 
   // ... other properties
+  string text = 2;
 }
 
 message Shelf {
   string name = 1;
 
   // ... other properties
+}
+
+message ListShelvesRequest {
+  int32 page_size = 1;
+
+  string page_token = 2;
+}
+
+message ListShelvesResponse {
+  repeated Shelf shelves = 1;
+
+  string next_page_token = 2;
 }
 
 message ListBooksRequest {
@@ -124,6 +149,10 @@ message UpdateBookRequest {
 
   // The update mask applies to the resource.
   google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteShelfRequest {
+  string name = 1;
 }
 
 message DeleteBookRequest {

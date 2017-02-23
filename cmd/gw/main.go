@@ -27,7 +27,7 @@ func run() error {
 		return err
 	}
 
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":8080", mux)
 	return nil
 }
 
