@@ -105,6 +105,16 @@ func (s *bookServer) CreateBook(ctx context.Context, request *CreateBookRequest)
 		return
 	}
 
+	exists, err = afero.Exists(s.Fs, request.Book.Name)
+	if err != nil {
+		return
+	}
+
+	if exists {
+		err = fmt.Errorf("Expected book %s not to exist", request.Book.Name)
+		return
+	}
+
 	err = afero.WriteFile(s.Fs, request.Book.Name, []byte(request.Book.Text), 0655)
 	if err != nil {
 		return

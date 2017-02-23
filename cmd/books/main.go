@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	port = flag.Int("port", 9090, "The port")
+	port          = flag.Int("port", 9090, "The port")
+	useFilesystem = flag.Bool("use-filesystem", false, "whether to use the filesystem")
 )
 
 func main() {
@@ -23,8 +24,17 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	var fs afero.Fs
+	switch {
+	case *useFilesystem:
+		fs = afero.NewOsFs()
+
+	case !*useFilesystem:
+		fs = afero.NewMemMapFs()
+	}
+
 	grpcServer := grpc.NewServer()
-	books.RegisterLibraryServiceServer(grpcServer, books.NewServer(afero.NewMemMapFs()))
+	books.RegisterLibraryServiceServer(grpcServer, books.NewServer(fs))
 
 	grpcServer.Serve(listener)
 }
